@@ -20,7 +20,7 @@ function in_array {
 
 previous_version=0
 while true ; do
-        jsondata=$(curl -q -L "http://${KUBERNETES_HOST_PORT}/api/v1beta1/pods?labels=${SELECTOR}" 2>/dev/null)
+        jsondata=$(curl -q -L "http://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1beta1/pods?labels=${SELECTOR}" 2>/dev/null)
         current_version=$(echo ${jsondata} | jq '[.items[]|.resourceVersion]|max')
         if [[ "${current_version}" -gt "${previous_version}" ]] ; then
                 #Something has changed
