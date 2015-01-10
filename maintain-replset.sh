@@ -47,7 +47,6 @@ while true ; do
                 done
 
                 echo $state
-                state="unconfigured"
 
                 case ${state} in
                         "unconfigured")
