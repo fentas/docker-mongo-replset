@@ -76,6 +76,10 @@ while true ; do
                                         fi
                                 done
                                 echo $new_ips
+                                for ip in $new_ips; do
+                                        echo "rs.add(\"$ip\")" | /usr/bin/mongo ${primary_ip} --quiet
+                                done
+
                                 # build removal list
                                 stale_ips=()
                                 for ip in ${configured_ips}; do
@@ -84,6 +88,10 @@ while true ; do
                                         fi
                                 done
                                 echo $stale_ips
+                                for ip in $stale_ips; do
+                                        echo "rs.remove(\"$ip:27017\")" | /usr/bin/mongo ${primary_ip} --quiet
+                                done
+
                 		previous_version=$current_version
                                 ;;
                         *)
