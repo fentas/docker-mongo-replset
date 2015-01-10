@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
 CURL=/usr/bin/curl
 JQ=/usr/bin/jq
 mongo=/usr/bin/mongo
 
 function join { local IFS="$1"; shift; echo "$*"; }
+
 function in_array {
         key=$1
         shift
