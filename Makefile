@@ -1,8 +1,8 @@
 NS = $(DOCKER_NS)
 VERSION ?= latest
 
-REPO = mongo-cluster
-NAME = mongo-cluster
+REPO = mongo-replset
+NAME = mongo-replset
 
 .PHONY: build push shell release
 
