@@ -56,14 +56,23 @@ while true ; do
         id=$(($id + 1))
       done
       host_json=$(join , "${host_array[@]}")
-      config_json="{ \"_id\": \"${MONGODB_REPLSET}\", \"members\": [ ${host_json} ]}"
+      config_json="{ \"_id\": \"${MONGO_REPLSET}\", \"members\": [ ${host_json} ]}"
       clean_json=$(echo ${config_json} | $jq -c .)
-      echo $clean_json
-      echo "rs.reconfig($clean_json,{force: true})" | /usr/bin/mongo ${primary_ip} --quiet
+      echo ${clean_json}
+
+      case $(echo "rs.status()" | $mongo --host ${primary_ip} --quiet | $jq -r '.code') in
+        94)
+          # { "info" : "run rs.initiate(...) if not yet done for the set", "ok" : 0, "errmsg" : "no replset config has been received", "code" : 94 } 
+          echo "if ( rs.initiate().ok ) rs.reconfig(${clean_json},{force: true})" | $mongo ${primary_ip} --quiet
+          ;;
+        *)
+          echo "rs.reconfig(${clean_json},{force: true})" | $mongo ${primary_ip} --quiet
+          ;;
+      esac
       ;;
     "configured")
       # Cluster configured, sync host list via primary
-      configured_ips=$(echo "rs.conf()" | /usr/bin/mongo ${primary_ip} --quiet | $jq .members[].host | sed 's/\"\([^:]*\):\([^:]*\)\"/\1/g')
+      configured_ips=$(echo "rs.conf()" | $mongo ${primary_ip} --quiet | $jq .members[].host | sed 's/\"\([^:]*\):\([^:]*\)\"/\1/g')
       echo ${configured_ips}
       # build additions list
       new_ips=()
@@ -74,7 +83,7 @@ while true ; do
       done
       echo $new_ips
       for ip in $new_ips; do
-             echo "rs.add(\"$ip\")" | /usr/bin/mongo ${primary_ip} --quiet
+             echo "rs.add(\"$ip\")" | $mongo ${primary_ip} --quiet
       done
 
       # build removal list
@@ -86,7 +95,7 @@ while true ; do
       done
       echo $stale_ips
       for ip in $stale_ips; do
-        echo "rs.remove(\"$ip:27017\")" | /usr/bin/mongo ${primary_ip} --quiet
+        echo "rs.remove(\"$ip:27017\")" | $mongo ${primary_ip} --quiet
       done
       ;;
          *)
