@@ -26,23 +26,28 @@ while true ; do
   # Determine if any replica set exists by iterating over the pods and checking rs.status()
   state="unconfigured"
   primary_ip=""
-  for ip in ${current_ips} ; do
-    # Does a replica set config exist?
-    echo $ip
-    instance_status=$(echo "rs.status().myState" | $mongo --host ${ip} --quiet)
-    echo $instance_status
-    if [[ "${instance_status}" != "" ]] ; then
-      # At least one node in the cluster is not in 'startup' state
-      state="unknown"
-    fi
-    if [[ "${instance_status}" == "1" ]] ; then
-      # found primary
-      state="configured"
+  if [ -z "${current_ips}" ]; then
+    echo "Nothing returned from: $dig +short ${SERVICE}"
+    state="unknown"
+  else
+    for ip in ${current_ips} ; do
+      # Does a replica set config exist?
+      echo $ip
+      instance_status=$(echo "rs.status().myState" | $mongo --host ${ip} --quiet)
+      echo $instance_status
+      if [[ "${instance_status}" != "" ]] ; then
+        # At least one node in the cluster is not in 'startup' state
+        state="unknown"
+      fi
+      if [[ "${instance_status}" == "1" ]] ; then
+        # found primary
+        state="configured"
+        primary_ip=${ip}
+        break
+      fi
       primary_ip=${ip}
-      break
-    fi
-    primary_ip=${ip}
-  done
+    done
+  fi
 
   echo $state
 
@@ -56,17 +61,16 @@ while true ; do
         id=$(($id + 1))
       done
       host_json=$(join , "${host_array[@]}")
-      config_json="{ \"_id\": \"${MONGO_REPLSET}\", \"members\": [ ${host_json} ]}"
-      clean_json=$(echo ${config_json} | $jq -c .)
-      echo ${clean_json}
+      config=$(echo "{ \"_id\": \"${MONGO_REPLSET}\", \"members\": [ ${host_json} ]}" | $jq -c .)
+      echo ${config}
 
       case $(echo "rs.status()" | $mongo --host ${primary_ip} --quiet | $jq -r '.code') in
         94)
-          # { "info" : "run rs.initiate(...) if not yet done for the set", "ok" : 0, "errmsg" : "no replset config has been received", "code" : 94 } 
-          echo "if ( rs.initiate().ok ) rs.reconfig(${clean_json},{force: true})" | $mongo ${primary_ip} --quiet
+          # { "info" : "run rs.initiate(...) if not yet done for the set", "ok" : 0, "errmsg" : "no replset config has been received", "code" : 94 }
+          echo "if ( rs.initiate().ok ) rs.reconfig(${config},{force: true})" | $mongo ${primary_ip} --quiet
           ;;
         *)
-          echo "rs.reconfig(${clean_json},{force: true})" | $mongo ${primary_ip} --quiet
+          echo "rs.reconfig(${config},{force: true})" | $mongo ${primary_ip} --quiet
           ;;
       esac
       ;;

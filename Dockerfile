@@ -2,8 +2,8 @@ FROM mongo:3.0
 
 MAINTAINER Jan Guth <jan.guth@gmail.com>
 
-ENV SERVICE="mongo-replSet"
-ENV MONGO_REPLSET="rs0"
+ENV SERVICE "mongo-replSet"
+ENV MONGO_REPLSET "rs0"
 
 RUN \
   apt-get update && \
