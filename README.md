@@ -60,7 +60,7 @@ First consider to create a config file for mongod on each host.
 ##### PRIMARY
 ```yml
 storage:
-  dbPath: "/data/db/"
+  dbPath: "/data/db/_/"
   directoryPerDB: true
   journal:
     enabled: true
@@ -69,7 +69,7 @@ net:
   port: 27017
 security:
   # same key on every host
-  keyFile: "/data/key/mongo-rs0.key"
+  keyFile: "/data/db/key/mongo-rs0.key"
   #TODO: first create admin user
   #authorization: "enabled"
 replication:
@@ -81,7 +81,7 @@ replication:
 ```yml
 # secondary
 storage:
-  dbPath: "/data/db/"
+  dbPath: "/data/db/_/"
   directoryPerDB: true
   journal:
     enabled: true
@@ -89,7 +89,7 @@ net:
   bindIp: 127.0.0.1
   port: 27017
 security:
-  keyFile: "/data/key/mongo-rs0.key"
+  keyFile: "/data/db/key/mongo-rs0.key"
   #TODO: first create admin user
   #authorization: "enabled"
 replication:
@@ -101,7 +101,7 @@ replication:
 ```yml
 # arbiter
 storage:
-  dbPath: "/data/arb/"
+  dbPath: "/data/db/_/"
   directoryPerDB: true
   journal:
     enabled: false
@@ -111,7 +111,7 @@ net:
   bindIp: 127.0.0.1
   port: 27017
 security:
-  keyFile: "/data/key/mongo-rs0.key"
+  keyFile: "/data/db/key/mongo-rs0.key"
   #TODO: first create admin user
 #   authorization: "enabled"
 replication:
@@ -124,6 +124,9 @@ Then add your hosts to Rancher. Each with a label named `mongo`. As value for
 this label you specify the role of of the mongo instance. You can add host
 labels on first time registration over cli or using `rancher/server` ui.
 [See here for more](http://docs.rancher.com/rancher/rancher-ui/infrastructure/hosts/custom/#host-labels)
+
+Due to a not implemented feature [see](https://github.com/rancher/rancher/issues/2601) also
+add host label `mongo-replset=1`.
 
 Now start your mongod instances, easily on specifying `mongo` key as schedule
 requirement.
@@ -149,8 +152,14 @@ mongo-replSet-rs0:
     - "27017:27017"
   volumes:
     - /data/mongo/mongod.yml:/mongod.yml:ro
+    - /data/mongo-rs0.key:/data/db/key/mongo-rs0.key
+    # if you want to host mongodb data
+    - /data/db/:/data/db/_/:rw
   labels:
-    io.rancher.scheduler.affinity:host_label: mongo in (primary, secondary, arbiter, hidden)
+    #Not possible yet https://github.com/rancher/rancher/issues/2601
+    #io.rancher.scheduler.affinity:host_label: mongo in (primary, secondary, arbiter, hidden)
+    #Workaround
+    io.rancher.scheduler.affinity:host_label: mongo-replset=1
   health_check:
     port: 27017
     interval: 2000
@@ -184,7 +193,8 @@ mongo-replSet-watch:
     AUTHENTICATION: "<admin user>:<password>"
   labels:
     # do this if you have more then 3 hosts (for this example)
-    io.rancher.scheduler.affinity:host_label_ne: mongo in (primary, secondary, arbiter, hidden)
+    #io.rancher.scheduler.affinity:host_label_ne: mongo in (primary, secondary, arbiter, hidden)
+    io.rancher.scheduler.affinity:host_label_ne: mongo-replset=1
     io.rancher.container.pull_image: always
 ```
 
