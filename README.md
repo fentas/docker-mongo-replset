@@ -17,19 +17,19 @@ Environment
 * `META_URL` ..rancher [meta data](http://docs.rancher.com/rancher/metadata-service/) url
 > "http://rancher-metadata/2015-07-25"
 
-* `SERVICE` .. (dns) service name
+* `SERVICE` ..(dns) service name
 > "mongo"
 
-* `HOST_LABEL` .. [host label](http://docs.rancher.com/rancher/rancher-ui/infrastructure/hosts/custom/#host-labels) for mongo instance preference
+* `HOST_LABEL` ..[host label](http://docs.rancher.com/rancher/rancher-ui/infrastructure/hosts/custom/#host-labels) for mongo instance preference
 > "mongo"
 
-* `INTERVAL` .. instance lookup interval (in secs)
+* `INTERVAL` ..instance lookup interval (in secs)
 > 30
 
-* `MAINTENANCE` .. if mongo instance preferences are of when to recondig replica set. (as [cron tab expression](https://github.com/fentas/cronexpr))
+* `MAINTENANCE` ..if mongo instance preferences are of when to recondig replica set. (as [cron tab expression](https://github.com/fentas/cronexpr))
 > "@daily"
 
-* `AUTHENTICATION` .. mongo authentication (needs admin permissions!) (as "<< user >>**:**<< password >>")
+* `AUTHENTICATION` ..needs admin permissions! (as "<< user >>**:**<< password >>")
 > ""
 
 TODO
