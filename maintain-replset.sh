@@ -15,7 +15,7 @@ cronexpr=/usr/bin/cronexpr
 __MONGO_REPLSET=${MONGO_REPLSET:-rs0}
 __VERBOSE=${VERBOSE:-6}
 __META_URL=${META_URL:-"http://rancher-metadata/2015-07-25"}
-__SERVICE=${SERVICE:-mongo}
+__SERVICE=${SERVICE:-mongo-replset}
 __HOST_LABEL=${HOST_LABEL:-mongo}
 __INTERVAL=${INTERVAL:-30}
 __MAINTENANCE=${MAINTENANCE:-@daily}
@@ -28,9 +28,10 @@ fi
 # GLOBALS
 #
 __CURRENT_IPS=""
+__RECONFIG=false
 declare -A __ROLES
 declare -A __PRIORITY
-__PRIORITY=(["primary"]=2 ["secondary"]=1 ["arbiter"]=0)
+__PRIORITY=(["primary"]=2 ["secondary"]=1 ["arbiter"]=0 ["hidden"]=0)
 
 #
 # FUNCTIONS
@@ -69,9 +70,14 @@ function .reconfig {
   MEMBERS=()
   for IP in ${__CURRENT_IPS} ; do
     EXTRA=""
-    if [ "${__ROLES[$IP]}" == "arbiter" ]; then
-      EXTRA+=", \"arbiterOnly\": true"
-    fi
+    case ${__ROLES[$IP]} in
+      "arbiter")
+        EXTRA+=", \"arbiterOnly\": true"
+        ;;
+      "hidden")
+        EXTRA+=", \"hidden\": true"
+        ;;
+    esac
     MEMBERS+=("{ \"_id\": ${ID}, \"host\":\"${IP}:${__PORT}\", \"priority\": ${__PRIORITY[${__ROLES[$IP]}]}${EXTRA} }")
     id=$((${ID} + 1))
   done
@@ -112,6 +118,9 @@ function .peers_check {
       "arbiter")
         echo "rs.addArb(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
         ;;
+      "hidden")
+        __RECONFIG=true
+        ;;
       *)
         echo "rs.add(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
         ;;
@@ -141,12 +150,18 @@ NEXT=$($cronexpr ${__MAINTENANCE})
 
 while true ; do
   DO_MAINTENANCE=false
+  TODO=""
 
   if [ ${NEXT} -lt $(date +%s) ]; then
     .log 5 "Maintenance window (${__MAINTENANCE})"
     DO_MAINTENANCE=true
     NEXT=$($cronexpr ${__MAINTENANCE})
     .log 6 "Next maintenance window: ${NEXT}"
+
+    if [ ! -z "${__TODO}" ]; then
+      TODO=${__RECONFIG}
+      __RECONFIG=""
+    fi
   fi
   __CURRENT_IPS=$($dig +short ${SERVICE})
 
@@ -158,9 +173,8 @@ while true ; do
 
   .log 7 "Current ips: ${__CURRENT_IPS[@]}"
   ALLMETA=$(curl -s -H 'Accept: application/json' ${META_URL})
-
   PRIMARY=""
-  TODO=""
+
   for IP in ${__CURRENT_IPS} ; do
     __ROLES[${IP}]=$(echo ${ALLMETA} | $jq -c ".containers[] as \$c | .hosts[] | select(.uuid == (\$c | select(.ips[] == \"${IP}\") | .host_uuid) ) | .labels.${HOST_LABEL}")
     __ROLES[${IP}]=${__ROLES[${IP}],,}
@@ -190,9 +204,9 @@ while true ; do
           fi
 
           ;;
-        2) # SECONDARY
-          if [ "${__ROLES[${IP}]}" != "secondary" ]; then
-            .log 5 "${IP}: should be SECONDAY is ${STATUS}"
+        2) # SECONDARY - HIDDEN
+          if [ "${__ROLES[${IP}]}" != "secondary" ] && [ "${__ROLES[${IP}]}" != "hidden" ]; then
+            .log 5 "${IP}: should be ${__ROLES[${IP}]^^} is ${STATUS}"
             TODO="reconfig"
           fi
           ;;
