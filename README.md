@@ -6,20 +6,31 @@ for any mongo replica set within [Rancher](http://rancher.com/).
 Environment
 ---
 * `MONGO_REPLSET` ..name of replica set
+
 > "rs0"
+
 * `VERBOSE` ..verbose level according to [https://en.wikipedia.org/wiki/Syslog#Severity_level](https://en.wikipedia.org/wiki/Syslog#Severity_level)
+
 > 6
+
 * `META_URL` ..rancher meta data url [http://docs.rancher.com/rancher/metadata-service/](http://docs.rancher.com/rancher/metadata-service/)
 > "http://rancher-metadata/2015-07-25"
+
 * `SERVICE` .. (dns) service name
 > "mongo"
+
 * `HOST_LABEL` .. host label for mongo instance preference [http://docs.rancher.com/rancher/rancher-ui/infrastructure/hosts/custom/#host-labels](http://docs.rancher.com/rancher/rancher-ui/infrastructure/hosts/custom/#host-labels)
 > "mongo"
+
 * `INTERVAL` .. instance lookup interval (in secs)
+
 > 30
 * `MAINTENANCE` .. if mongo instance preferences are of when to recondig replica set. (as [cron tab expression1](https://github.com/fentas/cronexpr))
+
 > "@daily"
+
 * `AUTHENTICATION` .. mongo authentication (has to be admin to reconfig cluster) (as "<user>:<password>")
+
 > ""
 
 TODO
@@ -51,6 +62,8 @@ Light reading
 Contributing
 ---
 Alway welcome. Feel free to create issues or pull requests.
+
+Originally forked from [https://github.com/azenk/mongodb-kubernetes](https://github.com/azenk/mongodb-kubernetes)
 
 Licence
 ---
