@@ -211,6 +211,7 @@ Light reading
 * [http://docs.rancher.com/rancher/](http://docs.rancher.com/rancher/)
 * [https://docs.mongodb.org/manual/core/replica-set-members/](https://docs.mongodb.org/manual/core/replica-set-members/)
 * [https://docs.mongodb.org/manual/reference/method/rs.reconfig/#rs.reconfig](https://docs.mongodb.org/manual/reference/method/rs.reconfig/#rs.reconfig)
+* [https://docs.mongodb.org/manual/tutorial/enable-internal-authentication/](https://docs.mongodb.org/manual/tutorial/enable-internal-authentication/)
 
 Contributing
 ---
