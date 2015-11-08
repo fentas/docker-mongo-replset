@@ -38,11 +38,11 @@ Checks every mongod instance behind a service and compares it to its
 host label (as means of configuration).
 This can be `primary`, `secondary`, `arbiter` and `hidden`.
 
-If the replica set is not initialized it will force `reconfig` it specified of
-the above configuration. (e.g. if `arbiter` **priority** of this member will be **0** and
+If the replica set is not initialized yet, it will force `reconfig` accordingly to
+the given host labels. (e.g. if `arbiter` **priority** of this member will be **0** and
 *arbiterOnly* **true**)
 
-If it is already initialized and there are any missfits a `reconfig` will be
+If it is already initialized and there are any missfits, a `reconfig` will be
 triggered on the specified `MAINTINACE` time.
 
 Also it has an eye on newcomers and stales. Meaning it will *add* or *remove*
@@ -172,7 +172,7 @@ mongo-replSet-watch:
 ##### docker-compose.yml
 ```yml
 mongo-replSet-watch:
-  image: mongo-replset:latest
+  image: fentas/mongo-replset:latest
   stdin_open: true
   tty: true
   restart: always
@@ -193,6 +193,7 @@ This shoud be it.
 TODOs
 ---
 * Testing
+* Then uploading to docker hub.
 * Work in progress. Any ideas?
 
 Light reading
