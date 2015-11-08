@@ -10,6 +10,7 @@ ENV HOST_LABEL "mongo"
 ENV INTERVAL 30
 ENV MAINTENANCE "@daily"
 ENV AUTHENTICATION ""
+ENV PORT 27017
 
 RUN \
   apt-get update && \

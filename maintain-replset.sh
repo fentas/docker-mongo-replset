@@ -12,12 +12,14 @@ cronexpr=/usr/bin/cronexpr
 #
 # ENVIRONMENT
 #
+__MONGO_REPLSET=${MONGO_REPLSET:-rs0}
 __VERBOSE=${VERBOSE:-6}
 __META_URL=${META_URL:-"http://rancher-metadata/2015-07-25"}
 __SERVICE=${SERVICE:-mongo}
 __HOST_LABEL=${HOST_LABEL:-mongo}
 __INTERVAL=${INTERVAL:-30}
 __MAINTENANCE=${MAINTENANCE:-@daily}
+__PORT=${PORT:-27017}
 if [ ! -z "${AUTHENTICATION}" ]; then
   __AUTHENTICATION="-u '${AUTHENTICATION//:*/}' -p '${AUTHENTICATION//*:/}'"
 fi
@@ -27,6 +29,8 @@ fi
 #
 __CURRENT_IPS=""
 declare -A __ROLES
+declare -A __PRIORITY
+__PRIORITY=(["primary"]=2 ["secondary"]=1 ["arbiter"]=0)
 
 #
 # FUNCTIONS
@@ -64,10 +68,14 @@ function .reconfig {
   ID=0
   MEMBERS=()
   for IP in ${__CURRENT_IPS} ; do
-    MEMBERS+=("{ \"_id\": ${ID}, \"host\":\"${IP}\" }")
+    EXTRA=""
+    if [ "${__ROLES[$IP]}" == "arbiter" ]; then
+      EXTRA+=", \"arbiterOnly\": true"
+    fi
+    MEMBERS+=("{ \"_id\": ${ID}, \"host\":\"${IP}:${__PORT}\", \"priority\": ${__PRIORITY[${__ROLES[$IP]}]}${EXTRA} }")
     id=$((${ID} + 1))
   done
-  CONFIG=$(echo "{ \"_id\": \"${MONGO_REPLSET}\", \"members\": [ $(.join , "${MEMBERS[@]}") ]}" | $jq -c .)
+  CONFIG=$(echo "{ \"_id\": \"${__MONGO_REPLSET}\", \"members\": [ $(.join , "${MEMBERS[@]}") ]}" | $jq -c .)
   .log 6 ${CONFIG}
 
   case $(echo "rs.status()" | $mongo --host ${PRIMARY} --quiet | $jq -r '.code') in
@@ -102,10 +110,10 @@ function .peers_check {
     .log 7 "Adding ${IP} as ${__ROLES[${IP}]}"
     case ${__ROLES[${IP}]} in
       "arbiter")
-        echo "rs.addArb(\"${IP}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+        echo "rs.addArb(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
         ;;
       *)
-        echo "rs.add(\"${IP}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+        echo "rs.add(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
         ;;
     esac
   done
@@ -121,7 +129,7 @@ function .peers_check {
 
   for IP in ${STALE_IPS}; do
     .log 6 "Removing ${IP} ( ${__ROLES[${IP}]} )"
-    echo "rs.remove(\"${IP}:27017\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+    echo "rs.remove(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
   done
 }
 
@@ -135,15 +143,15 @@ while true ; do
   DO_MAINTENANCE=false
 
   if [ ${NEXT} -lt $(date +%s) ]; then
-    .log 6 "Maintenance window (${__MAINTENANCE})"
+    .log 5 "Maintenance window (${__MAINTENANCE})"
     DO_MAINTENANCE=true
     NEXT=$($cronexpr ${__MAINTENANCE})
-    .log 7 "Next maintenance window: ${NEXT}"
+    .log 6 "Next maintenance window: ${NEXT}"
   fi
   __CURRENT_IPS=$($dig +short ${SERVICE})
 
   if [ -z "${__CURRENT_IPS}" ]; then
-    .log 4 "Nothing returned from: $dig +short ${SERVICE}"
+    .log 2 "Nothing returned from: $dig +short ${SERVICE}"
     sleep ${__INTERVAL}
     continue
   fi
@@ -224,7 +232,8 @@ while true ; do
     "configured")
         .peers_check
       ;;
-    *)
+    "unknown")
+      .log 4 "Status of replica set is unknown"
       ;;
   esac
 
