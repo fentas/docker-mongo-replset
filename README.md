@@ -202,8 +202,7 @@ This shoud be it.
 
 TODOs
 ---
-* Testing
-* Then uploading to docker hub.
+* Somehow writing test case(?)
 * Work in progress. Any ideas?
 
 Light reading
