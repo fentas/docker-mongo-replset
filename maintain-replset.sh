@@ -21,7 +21,7 @@ __INTERVAL=${INTERVAL:-30}
 __MAINTENANCE=${MAINTENANCE:-@daily}
 __PORT=${PORT:-27017}
 if [ ! -z "${AUTHENTICATION}" ]; then
-  __AUTHENTICATION=(-u "'${AUTHENTICATION//:*/}'" -p "'${AUTHENTICATION//*:/}'" --authenticationDatabase 'admin')
+  __AUTHENTICATION=(-u ${AUTHENTICATION//:*/} -p ${AUTHENTICATION//*:/} --authenticationDatabase 'admin')
 fi
 #
 # GLOBALS
@@ -77,8 +77,9 @@ function .reconfig {
         EXTRA+=", \"hidden\": true"
         ;;
     esac
-    MEMBERS+=("{ \"_id\": ${ID}, \"host\":\"${IP}:${__PORT}\", \"priority\": ${__PRIORITY[${__ROLES[$IP]}]}${EXTRA} }")
-    id=$((${ID} + 1))
+    PRIORITY=${__PRIORITY[${__ROLES[$IP]}]}
+    MEMBERS+=("{ \"_id\": ${ID}, \"host\":\"${IP}:${__PORT}\", \"priority\": ${PRIORITY}${EXTRA} }")
+    ID=$((${ID} + 1))
   done
   CONFIG=$(echo "{ \"_id\": \"${__MONGO_REPLSET}\", \"members\": [ $(.join , "${MEMBERS[@]}") ]}" | $jq -c .)
   .log 6 ${CONFIG}
@@ -90,8 +91,8 @@ function .reconfig {
       echo "if ( rs.initiate().ok ) rs.reconfig(${CONFIG}, { force: ${FORCE} })" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
       ;;
     *)
-      .log 7 "Status code: ${1}"
-      echo "rs.reconfig(${CONFIG}, { force: ${FORCE} })" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
+      .log 7 "Rs status code: ${1}"
+      .log 6 $(echo "rs.reconfig(${CONFIG}, { force: ${FORCE} })" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet)
       ;;
   esac
 }
@@ -105,23 +106,24 @@ function .peers_check {
   # build additions list
   NEW_IPS=()
   for IP in ${__CURRENT_IPS}; do
-    if ! in_array ${IP} ${CONFIGURED_IPS}; then
+    if ! .in_array ${IP} ${CONFIGURED_IPS}; then
       NEW_IPS+=(${IP})
     fi
   done
   if [ ! -z "${NEW_IPS[@]}" ]; then .log 6 "New ips: ${NEW_IPS[@]}"; fi
 
   for IP in ${NEW_IPS}; do
-    .log 7 "Adding ${IP} as ${__ROLES[${IP}]}"
+    .log 6 "Adding ${IP} as ${__ROLES[${IP}]}"
     case ${__ROLES[${IP}]} in
       "arbiter")
-        echo "rs.addArb(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
+        .log 7 $(echo "rs.addArb(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet)
         ;;
       "hidden")
+        .log 6 "Hidden instance will be configured next maintinance window."
         __RECONFIG=true
         ;;
       *)
-        echo "rs.add(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
+        .log 7 $(echo "rs.add(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet)
         ;;
     esac
   done
@@ -129,15 +131,15 @@ function .peers_check {
   # build removal list
   STALE_IPS=()
   for IP in ${CONFIGURED_IPS}; do
-    if ! in_array ${IP} ${__CURRENT_IPS}; then
+    if ! .in_array ${IP} ${__CURRENT_IPS}; then
       STALE_IPS+=(${IP})
     fi
   done
   if [ ! -z "${STALE_IPS[@]}" ]; then .log 5 "Stale ips: ${STALE_IPS[@]}"; fi
 
   for IP in ${STALE_IPS}; do
-    .log 6 "Removing ${IP} ( ${__ROLES[${IP}]} )"
-    echo "rs.remove(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
+    .log 5 "Removing ${IP} ( ${__ROLES[${IP}]} )"
+    .log 7 $(echo "rs.remove(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet)
   done
 }
 
@@ -175,7 +177,7 @@ while true ; do
   PRIMARY=""
 
   for IP in ${__CURRENT_IPS} ; do
-    __ROLES[${IP}]=$(echo ${ALLMETA} | $jq -c ".containers[] as \$c | .hosts[] | select(.uuid == (\$c | select(.ips[] == \"${IP}\") | .host_uuid) ) | .labels.${HOST_LABEL}")
+    __ROLES[${IP}]=$(echo ${ALLMETA} | $jq -r ".containers[] as \$c | .hosts[] | select(.uuid == (\$c | select(.ips[] == \"${IP}\") | .host_uuid) ) | .labels.${HOST_LABEL}")
     __ROLES[${IP}]=${__ROLES[${IP}],,}
     .log 7 "${IP}: ${__ROLES[${IP}]}"
     STATUS=$(echo "rs.status().myState" | $mongo ${IP}:${__PORT} ${__AUTHENTICATION[@]} --quiet)
@@ -216,7 +218,7 @@ while true ; do
           fi
           ;;
       esac
-      if [ -z "${PRIMARY}" ] && [ "${__ROLES[${IP}]}" != "arbiter" ]; then
+      if [ -z "${PRIMARY}" ] && [ "${__ROLES[${IP}]}" == "primary" ]; then
         PRIMARY=${IP}
       fi
     fi
@@ -228,7 +230,7 @@ while true ; do
   .log 7 "TODO: ${TODO}; AS PRIMARY: ${PRIMARY}"
 
   if [ -z "${PRIMARY}" ]; then
-    .log 4 "There is no instance for PRIMARY"
+    .log 1 "There is no instance for PRIMARY"
     sleep ${__INTERVAL}
     continue
   fi
@@ -243,7 +245,7 @@ while true ; do
       fi
       ;;
     "configured")
-        .peers_check
+        .peers_check "${PRIMARY}"
       ;;
     "unknown")
       .log 4 "Status of replica set is unknown"
