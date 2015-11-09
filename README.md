@@ -29,7 +29,7 @@ Environment
 * `MAINTENANCE` ..if mongo instance preferences are of when to recondig replica set. (as [cron tab expression](https://github.com/fentas/cronexpr))
 > "@daily"
 
-* `AUTHENTICATION` ..needs admin permissions! (as "<< user >>**:**<< password >>")
+* `AUTHENTICATION` ..needs clusterManager admin role. (as "<< user >>**:**<< password >>")
 > ""
 
 Behavior

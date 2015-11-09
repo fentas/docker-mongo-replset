@@ -21,7 +21,7 @@ __INTERVAL=${INTERVAL:-30}
 __MAINTENANCE=${MAINTENANCE:-@daily}
 __PORT=${PORT:-27017}
 if [ ! -z "${AUTHENTICATION}" ]; then
-  __AUTHENTICATION="-u '${AUTHENTICATION//:*/}' -p '${AUTHENTICATION//*:/}'"
+  __AUTHENTICATION="-u '${AUTHENTICATION//:*/}' -p '${AUTHENTICATION//*:/}' --authenticationDatabase 'admin'"
 fi
 
 #
