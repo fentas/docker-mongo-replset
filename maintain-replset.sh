@@ -21,9 +21,8 @@ __INTERVAL=${INTERVAL:-30}
 __MAINTENANCE=${MAINTENANCE:-@daily}
 __PORT=${PORT:-27017}
 if [ ! -z "${AUTHENTICATION}" ]; then
-  __AUTHENTICATION="-u '${AUTHENTICATION//:*/}' -p '${AUTHENTICATION//*:/}' --authenticationDatabase 'admin'"
+  __AUTHENTICATION=(-u '${AUTHENTICATION//:*/}' -p '${AUTHENTICATION//*:/}' --authenticationDatabase 'admin')
 fi
-
 #
 # GLOBALS
 #
@@ -84,15 +83,15 @@ function .reconfig {
   CONFIG=$(echo "{ \"_id\": \"${__MONGO_REPLSET}\", \"members\": [ $(.join , "${MEMBERS[@]}") ]}" | $jq -c .)
   .log 6 ${CONFIG}
 
-  case $(echo "rs.status()" | $mongo --host ${PRIMARY} --quiet | $jq -r '.code') in
+  case $(echo "rs.status()" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet | $jq -r '.code') in
     94)
       .log 5 "Status code: 94 - Needs to be initiated."
       # { "info" : "run rs.initiate(...) if not yet done for the set", "ok" : 0, "errmsg" : "no replset config has been received", "code" : 94 }
-      echo "if ( rs.initiate().ok ) rs.reconfig(${CONFIG}, { force: ${FORCE} })" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+      echo "if ( rs.initiate().ok ) rs.reconfig(${CONFIG}, { force: ${FORCE} })" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
       ;;
     *)
       .log 7 "Status code: ${1}"
-      echo "rs.reconfig(${CONFIG}, { force: ${FORCE} })" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+      echo "rs.reconfig(${CONFIG}, { force: ${FORCE} })" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
       ;;
   esac
 }
@@ -100,7 +99,7 @@ function .reconfig {
 function .peers_check {
   local PRIMARY=${1}
   # Cluster configured, sync host list via primary
-  CONFIGURED_IPS=$(echo "rs.conf()" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet | $jq .members[].host | sed 's/\"\([^:]*\):\([^:]*\)\"/\1/g')
+  CONFIGURED_IPS=$(echo "rs.conf()" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet | $jq .members[].host | sed 's/\"\([^:]*\):\([^:]*\)\"/\1/g')
   .log 7 "Configured ips: ${CONFIGURED_IPS[@]}"
 
   # build additions list
@@ -116,13 +115,13 @@ function .peers_check {
     .log 7 "Adding ${IP} as ${__ROLES[${IP}]}"
     case ${__ROLES[${IP}]} in
       "arbiter")
-        echo "rs.addArb(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+        echo "rs.addArb(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
         ;;
       "hidden")
         __RECONFIG=true
         ;;
       *)
-        echo "rs.add(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+        echo "rs.add(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
         ;;
     esac
   done
@@ -138,7 +137,7 @@ function .peers_check {
 
   for IP in ${STALE_IPS}; do
     .log 6 "Removing ${IP} ( ${__ROLES[${IP}]} )"
-    echo "rs.remove(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY} ${__AUTHENTICATION} --quiet
+    echo "rs.remove(\"${IP}:${__PORT}\")" | $mongo ${PRIMARY}:${__PORT} ${__AUTHENTICATION[@]} --quiet
   done
 }
 
@@ -179,7 +178,7 @@ while true ; do
     __ROLES[${IP}]=$(echo ${ALLMETA} | $jq -c ".containers[] as \$c | .hosts[] | select(.uuid == (\$c | select(.ips[] == \"${IP}\") | .host_uuid) ) | .labels.${HOST_LABEL}")
     __ROLES[${IP}]=${__ROLES[${IP}],,}
     .log 7 "${IP}: ${__ROLES[${IP}]}"
-    STATUS=$(echo "rs.status().myState" | $mongo ${IP} ${__AUTHENTICATION} --quiet)
+    STATUS=$(echo "rs.status().myState" | $mongo ${IP}:${__PORT} ${__AUTHENTICATION[@]} --quiet)
     .log 7 "${IP}: myState ${STATUS}"
 
     if [ "${__ROLES[${IP}]}" == "null" ]; then
