@@ -181,7 +181,13 @@ while true ; do
     __ROLES[${IP}]=${__ROLES[${IP}],,}
     .log 7 "${IP}: ${__ROLES[${IP}]}"
     STATUS=$(echo "rs.status().myState" | $mongo ${IP}:${__PORT} ${__AUTHENTICATION[@]} --quiet)
-    .log 7 "${IP}: myState ${STATUS}"
+    if [ $? -ne 0 ]; then
+      CODE=$?
+      .log 4 "${IP}: mongo client failed with ${CODE}." ${STATUS}
+      STATUS=""
+    else
+      .log 7 "${IP}: myState ${STATUS}"
+    fi
 
     if [ "${__ROLES[${IP}]}" == "null" ]; then
       .log 3 "${IP}: has no host label. Will be ignored."
